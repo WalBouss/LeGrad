@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="LeGrad: An Explainability Method for Vision Transformers via Feature Formation Sensitivity">
+  <meta name="keywords" content="LeGrad, ViT, Explainability">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LeGrad: An Explainability Method for Vision Transformers via Feature Formation Sensitivity</title>
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PYVRSFMDRL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'G-PYVRSFMDRL');
+  </script>
+   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs/themes/prism.css">
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
+        rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="icon" href="./static/images/logo_legrad.png" style="border-radius: 100%;">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+</head>
+<body>
+
+<nav class="navbar" role="navigation" aria-label="main navigation">
+  <div class="navbar-brand">
+    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </a>
+  </div>
+  <div class="navbar-menu">
+    <div class="navbar-start" style="flex-grow: 1; justify-content: center;">
+      <a class="navbar-item" href="https://walidbousselham.com/">
+      <span class="icon">
+          <i class="fas fa-home"></i>
+      </span>
+      </a>
+
+      <div class="navbar-item has-dropdown is-hoverable">
+        <a class="navbar-link">
+          More Research
+        </a>
+        <div class="navbar-dropdown">
+          <a class="navbar-item" href="https://github.com/WalBouss/GEM">
+            GEM (Grounding Everything Module)
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</nav>
+
+
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <img src="./static/images/logo_legrad_5.png" style="width:20%;max-width:20%;object-fit: cover; border-radius: 50%;"/>
+          <h1 class="title is-1 publication-title">LeGrad: An Explainability Method for Vision Transformers via Feature Formation Sensitivity</h1>
+          <div class="is-size-5 publication-authors">
+            <span class="author-block">
+              <a href="https://walidbousselham.com/">Walid Bousselham</a><sup>1,2</sup>,</span>
+            <span class="author-block">
+              <a href="http://angieboggust.com/">Angie Boggust</a><sup>3</sup>,</span>
+            <span class="author-block">
+              <a href="">Sofian Chaybouti</a><sup>1,2</sup>,
+            </span>
+            <span class="author-block">
+              <a href="http://hendrik.strobelt.com/">Hendrik Strobelt</a><sup>4,5</sup>,
+            </span>
+            <span class="author-block">
+              <a href="https://hildekuehne.github.io/">Hilde Kuehne</a><sup>1,2,4</sup>,
+            </span>
+          </div>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><sup>1</sup>University of Bonn</span>
+            <span class="author-block"><sup>2</sup>Goethe University Frankfurt</span>
+            <span class="author-block"><sup>3</sup>MIT CSAIL</span>
+            <span class="author-block"><sup>4</sup>MIT-IBM Watson AI Lab</span>
+            <span class="author-block"><sup>5</sup>IBM Research</span>
+          </div>
+
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <!-- PDF Link. -->
+              <span class="link-block">
+                <a href="https://arxiv.org/pdf/2011.12948"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fas fa-file-pdf"></i>
+                  </span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2011.12948"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="ai ai-arxiv"></i>
+                  </span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+
+              <!-- Code Link. -->
+              <span class="link-block">
+                <a href="https://github.com/WalBouss/LeGrad"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fab fa-github"></i>
+                  </span>
+                  <span>Code</span>
+                  </a>
+              </span>
+
+              <!-- HF Demo Link. -->
+              <span class="link-block">
+                <a href="https://huggingface.co/spaces/WalidBouss/LeGrad"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+<!--                      <i class="fab fa-github"></i>-->
+<!--                    <i class="fa-regular fa-face-smiling-hands"></i>-->
+                    <img src="static/images/hf-logo.svg">
+                  </span>
+                  <span>Demo</span>
+                  </a>
+              </span>
+              <!-- Dataset Link. -->
+<!--              <span class="link-block">-->
+<!--                <a href="https://github.com/google/nerfies/releases/tag/0.1"-->
+<!--                   class="external-link button is-normal is-rounded is-dark">-->
+<!--                  <span class="icon">-->
+<!--                      <i class="far fa-images"></i>-->
+<!--                  </span>-->
+<!--                  <span>Data</span>-->
+<!--                  </a>-->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <img src="./static/images/teaser_figure_longer.png" />
+      <h2 class="subtitle has-text-centered">
+         LeGrad is an explainability method specifically designed for Vision Transformers.
+        </h2>
+    </div>
+  </div>
+</section>
+
+
+<!--<section class="hero is-light is-small">-->
+<!--  <div class="hero-body">-->
+<!--    <div class="container">-->
+<!--      <div id="results-carousel" class="carousel results-carousel">-->
+<!--        <div class="item item-steve">-->
+<!--          <img src="./static/images/teaser_figure_longer.png" />-->
+<!--&lt;!&ndash;          <video poster="" id="steve" autoplay controls muted loop playsinline height="100%">&ndash;&gt;-->
+<!--&lt;!&ndash;            <source src="./static/videos/steve.mp4"&ndash;&gt;-->
+<!--&lt;!&ndash;                    type="video/mp4">&ndash;&gt;-->
+<!--&lt;!&ndash;          </video>&ndash;&gt;-->
+<!--        </div>-->
+<!--        <div class="item item-chair-tp">-->
+<!--          <img src="./static/images/teaser_figure_longer.png" />-->
+<!--        </div>-->
+<!--      </div>-->
+<!--    </div>-->
+<!--  </div>-->
+<!--</section>-->
+
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Abstract. -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            Vision Transformers (ViTs), with their ability to model long-range dependencies through self-attention mechanisms, have become a standard architecture in computer vision. However, the interpretability of these models remains a challenge.
+To address this, we propose LeGrad, an explainability method specifically designed for ViTs.
+          </p>
+          <p>
+<span class="dnerf">LeGrad</span> computes the gradient with respect to the attention maps of ViT layers, considering the gradient itself as the explainability signal.
+We aggregate the signal over all layers, combining the activations of the last as well as intermediate tokens to produce the merged explainability map.
+This makes LeGrad a conceptually simple and an easy-to-implement tool for enhancing the transparency of ViTs.
+          </p>
+            <p>
+We evaluate LeGrad in challenging segmentation, perturbation, and open-vocabulary settings, showcasing its versatility compared to other SotA explainability methods demonstrating its superior spatial fidelity and robustness to perturbations.
+          </p>
+        </div>
+      </div>
+    </div>
+    <!--/ Abstract. -->
+
+    <!-- Paper Method. -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Method</h2>
+        <div class="method-figure">
+          <img src="./static/images/method_figure.jpg" />
+        </div>
+        <h2 class="content has-text-justified">
+          <p>
+         LeGrad introduces a novel explainability approach for Vision Transformers (ViTs) by elucidating the sensitivity of feature formation across different layers of the model.
+          By focusing on the model's attention mechanism, LeGrad computes gradients to highlight image regions pivotal for the model's decision-making process.
+          This method not only provides insights for a single layer but also aggregates information across multiple layers to offer a comprehensive understanding of how each image region contributes to the final prediction.
+          Through this technique, LeGrad aims to enhance the interpretability of ViTs, offering a clearer perspective on the model's internal workings and decision rationale.
+          </p>
+        </h2>
+        <div class="method-figure">
+          <img src="./static/images/layer_method.jpg" />
+        </div>
+      </div>
+    </div>
+    <!--/ Paper Method. -->
+  </div>
+</section>
+
+
+<section class="section">
+  <div class="container is-max-desktop is-centered ">
+        <div class="content has-text-justified ">
+
+<!--      <div class="columns is-centered has-text-centered">-->
+<!--      <div class="column is-four-fifths">-->
+  <h2 class="title is-3 is-centered has-text-centered ">Results</h2>
+        <!-- Layers ablation. -->
+        <h3 class="title is-4">Layers Importance</h3>
+          <p>
+            Impact of each layer on the merged perdition, using "a photo of a cat" as prompt for the last layers of ViT-H/14.
+          </p>
+        </div>
+        <div class="columns is-vcentered interpolation-panel">
+          <div class="column is-3 has-text-centered">
+            <img src="./static/images/img_prompt_cat.png"
+                 class="interpolation-image"
+                 alt="Image of 2 cats and 2 remote control."/>
+            <p>Image</p>
+          </div>
+          <div class="column interpolation-video-column">
+            <div id="interpolation-image-wrapper">
+              Loading...
+            </div>
+            <input class="slider is-fullwidth is-large is-info"
+                   id="interpolation-slider"
+                   step="1" min="0" max="11" value="0" type="range">
+          </div>
+          <div class="column is-3 has-text-centered">
+            <img src="./static/images/merged_prediction.jpg"
+                 class="interpolation-image"
+                 alt="Interpolation end reference image."/>
+            <p class="is-bold">Merged Prediction</p>
+          </div>
+        </div>
+        <br/>
+        <!--/ Layers ablation. -->
+
+        <!-- Qualitative Examples. -->
+        <div>
+        <h3 class="title is-4">Qualitative Examples</h3>
+          <img src="./static/images/qualitative_sota.jpg"
+                 class="interpolation-image"
+                 alt="Interpolation end reference image."/>
+        </div>
+        <!--/ Qualitative Examples. -->
+
+      </div>
+    </div>
+    </div>
+    <!--/ Animation. -->
+      <!-- Qualitative Examples. -->
+
+        <!--/ Qualitative Examples. -->
+
+<!-- Code -->
+<!-- <div class="columns is-centered is-max-desktop">
+      <div class="column is-centered has-text-centered">
+        <h2 class="title is-3">Use LeGrad in your own project</h2>
+        <img src="./static/images/image_install_legrad.png"
+                 class="install-legrad"/> -->
+
+  <div class="columns is-centered is-max-desktop">
+<div class="column is-centered has-text-centered">
+  <h2 class="title is-3">Use LeGrad in your own project</h2>
+  <div class="container is-max-desktop content has-text-justified">
+<!--        <img src="./static/images/image_install_legrad.png"-->
+<!--                 class="install-legrad"/>-->
+  <pre><code>pip install legrad_torch
+</code></pre>
+<!--          <pre><code class="language-python "> $ pip install legrad_torch-->
+<!--</code></pre>-->
+<!--<script src="https://cdn.jsdelivr.net/npm/prismjs/prism.js"></script>-->
+<!--<script>Prism.highlightAll();</script>-->
+        </div>
+  </div>
+<!-- Code. -->
+
+<!--    &lt;!&ndash; Concurrent Work. &ndash;&gt;-->
+<!--    <div class="columns is-centered">-->
+<!--      <div class="column is-full-width">-->
+<!--        <h2 class="title is-3">Related Links</h2>-->
+
+<!--        <div class="content has-text-justified">-->
+<!--          <p>-->
+<!--            There's a lot of excellent work that was introduced around the same time as ours.-->
+<!--          </p>-->
+<!--          <p>-->
+<!--            <a href="https://arxiv.org/abs/2104.09125">Progressive Encoding for Neural Optimization</a> introduces an idea similar to our windowed position encoding for coarse-to-fine optimization.-->
+<!--          </p>-->
+<!--          <p>-->
+<!--            <a href="https://www.albertpumarola.com/research/D-NeRF/index.html">D-NeRF</a> and <a href="https://gvv.mpi-inf.mpg.de/projects/nonrigid_nerf/">NR-NeRF</a>-->
+<!--            both use deformation fields to model non-rigid scenes.-->
+<!--          </p>-->
+<!--          <p>-->
+<!--            Some works model videos with a NeRF by directly modulating the density, such as <a href="https://video-nerf.github.io/">Video-NeRF</a>, <a href="https://www.cs.cornell.edu/~zl548/NSFF/">NSFF</a>, and <a href="https://neural-3d-video.github.io/">DyNeRF</a>-->
+<!--          </p>-->
+<!--          <p>-->
+<!--            There are probably many more by the time you are reading this. Check out <a href="https://dellaert.github.io/NeRF/">Frank Dellart's survey on recent NeRF papers</a>, and <a href="https://github.com/yenchenlin/awesome-NeRF">Yen-Chen Lin's curated list of NeRF papers</a>.-->
+<!--          </p>-->
+<!--        </div>-->
+<!--      </div>-->
+<!--    </div>-->
+<!--    &lt;!&ndash;/ Concurrent Work. &ndash;&gt;-->
+
+  </div>
+    </div>
+</section>
+
+
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">BibTeX</h2>
+    <pre><code>@article{bousselham2024legrad,
+  author    = {Bousselham, Walid and Boggust, Angie and Chaybouti, Sofian and Strobelt, Hendrik and Kuehne, Hilde}
+  title     = {LeGrad: An Explainability Method for Vision Transformers via Feature Formation Sensitivity},
+  journal   = {arXiv preprint arXiv:2404.03214},
+  year      = {2024},
+}</code></pre>
+  </div>
+</section>
+
+
+<footer class="footer">
+  <div class="container">
+    <div class="content has-text-centered">
+      <a class="icon-link"
+         href="./static/videos/nerfies_paper.pdf">
+        <i class="fas fa-file-pdf"></i>
+      </a>
+      <a class="icon-link" href="https://github.com/keunhong" class="external-link" disabled>
+        <i class="fab fa-github"></i>
+      </a>
+    </div>
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content">
+          <p>
+            This website is licensed under a <a rel="license"
+                                                href="http://creativecommons.org/licenses/by-sa/4.0/">Creative
+            Commons Attribution-ShareAlike 4.0 International License</a>.
+          </p>
+          <p>
+            This means you are free to borrow the <a
+              href="https://github.com/nerfies/nerfies.github.io">source code</a> of this website,
+            we just ask that you link back to this page in the footer.
+            Please remember to remove the analytics code included in the header of the website which
+            you do not want on your website.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

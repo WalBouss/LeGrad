@@ -1,0 +1,9 @@
+torch>=1.11
+torchvision
+timm
+open_clip_torch
+opencv-python
+matplotlib
+numpy
+requests
+einops
