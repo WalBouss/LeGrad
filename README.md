@@ -61,7 +61,7 @@ import open_clip
 import torch
 
 from legrad import LeWrapper, LePreprocess
-from utils import visualize
+from legrad.utils import visualize
 
 # ------- model's paramters -------
 model_name = 'ViT-B-16'
