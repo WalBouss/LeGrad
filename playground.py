@@ -18,7 +18,7 @@ model = LeWrapper(model)
 # ___ (Optional): Wrapper for Higher-Res input image ___
 preprocess = LePreprocess(preprocess=preprocess, image_size=448)
 
-# ------- init inputs: image + text -------
+# ------- init inputs: image +  text -------
 url = "http://images.cocodataset.org/val2017/000000039769.jpg"
 image = preprocess(Image.open(requests.get(url, stream=True).raw)).unsqueeze(0).to(device)
 text = tokenizer(['a photo of a cat', 'a photo of a remote control']).to(device)
@@ -26,8 +26,7 @@ text = tokenizer(['a photo of a cat', 'a photo of a remote control']).to(device)
 # -------
 text_embedding = model.encode_text(text, normalize=True)
 print(image.shape)
-# explainability_map = model.compute_legrad_clip(image=image, text_embedding=text_embedding)
-explainability_map = model.compute_legrad_vmap_clip(image=image, text_embedding=text_embedding)
+explainability_map = model.compute_legrad_clip(image=image, text_embedding=text_embedding)
 
 # ___ (Optional): Visualize overlay of the image + heatmap ___
 visualize(heatmaps=explainability_map, image=image)
