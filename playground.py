@@ -11,6 +11,8 @@ pretrained = 'laion2b_s34b_b88k'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ------- init model -------
 model, _, preprocess = open_clip.create_model_and_transforms(model_name=model_name, pretrained=pretrained, device=device)
+
+## Change to use cogvlm 
 tokenizer = open_clip.get_tokenizer(model_name=model_name)
 model.eval()
 # ------- Equip the model with LeGrad -------
@@ -21,7 +23,11 @@ preprocess = LePreprocess(preprocess=preprocess, image_size=448)
 # ------- init inputs: image +  text -------
 url = "http://images.cocodataset.org/val2017/000000039769.jpg"
 image = preprocess(Image.open(requests.get(url, stream=True).raw)).unsqueeze(0).to(device)
-text = tokenizer(['a photo of a cat', 'a photo of a remote control']).to(device)
+# text = tokenizer(['a photo of a cat', 'a photo of a remote control']).to(device)
+# text = tokenizer(['a photo of a cat']).to(device)
+
+text = tokenizer(['a photo of a remote control']).to(device)
+
 
 # -------
 text_embedding = model.encode_text(text, normalize=True)

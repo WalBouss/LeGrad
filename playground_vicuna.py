@@ -1,83 +1,189 @@
+# import argparse
 # import requests
 # from PIL import Image
-# import open_clip
 # import torch
-# from transformers import AutoTokenizer
+# import numpy as np
+# import cv2
+# from transformers import AutoModelForCausalLM, LlamaTokenizer
 # from legrad import LeWrapper, LePreprocess, visualize
-# from token_alignment import align_tokens  # Import the alignment function
 #
-# # Setup
-# model_name = 'ViT-B-16'
-# pretrained = 'laion2b_s34b_b88k'
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# model, _, preprocess = open_clip.create_model_and_transforms(model_name=model_name, pretrained=pretrained, device=device)
-# open_tokenizer = open_clip.get_tokenizer(model_name=model_name)
-# tokenizer = AutoTokenizer.from_pretrained('lmsys/vicuna-7b-v1.5')
-# model = LeWrapper(model).to(device)
-# preprocess = LePreprocess(preprocess=preprocess, image_size=448)
+# # Parse arguments for CogVLM initialization
+# parser = argparse.ArgumentParser()
+# parser.add_argument("--quant", choices=[4], type=int, default=None, help='quantization bits')
+# parser.add_argument("--from_pretrained", type=str, default="THUDM/cogagent-chat-hf", help='pretrained ckpt')
+# parser.add_argument("--local_tokenizer", type=str, default="lmsys/vicuna-7b-v1.5", help='tokenizer path')
+# parser.add_argument("--fp16", action="store_true")
+# parser.add_argument("--bf16", action="store_true")
+# args = parser.parse_args()
 #
-# # Process image
-# url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-# image = preprocess(Image.open(requests.get(url, stream=True).raw)).unsqueeze(0).to(device)
+# # Setup device and data type
+# DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+# torch_type = torch.bfloat16 if args.bf16 else torch.float16
 #
-# # Align and use tokens
-# text = ['a photo of a cat', 'a photo of a remote control']
-# aligned_tokens = align_tokens(open_tokenizer, tokenizer, text)
-# # print(aligned_tokens)
-# # print(open_tokenizer)
-# # print(tokenizer)
-# print(aligned_tokens)
-# first_tokens = aligned_tokens[1]
-# input_ids = torch.tensor(first_tokens, dtype=torch.long).unsqueeze(0).to(device)  # Adjust dimensions as necessary
+# # Initialize tokenizer
+# tokenizer = LlamaTokenizer.from_pretrained(args.local_tokenizer)
 #
-# try:
-#     text_embedding = model.encode_text(input_ids, normalize=True)
-#     explainability_map = model.compute_legrad_clip(image=image, text_embedding=text_embedding)
-#     visualize(heatmaps=explainability_map, image=image)
-# except RuntimeError as e:
-#     print("Runtime error:", e)
+# # Initialize model
+# if args.quant:
+#     model = AutoModelForCausalLM.from_pretrained(
+#         args.from_pretrained,
+#         torch_dtype=torch_type,
+#         low_cpu_mem_usage=True,
+#         load_in_4bit=True,
+#         trust_remote_code=True
+#     ).eval()
+# else:
+#     model = AutoModelForCausalLM.from_pretrained(
+#         args.from_pretrained,
+#         torch_dtype=torch_type,
+#         low_cpu_mem_usage=True,
+#         load_in_4bit=args.quant is not None,
+#         trust_remote_code=True
+#     ).to(DEVICE).eval()
+#
+# # Equip the model with LeGrad
+# model = LeWrapper(model)
+#
+# # Define the preprocessing steps
+# preprocess_pipeline = LePreprocess(preprocess=preprocess, image_size=448)
+#
+# # Function to load image from URL
+# def change_to_url(url):
+#     img_pil = Image.open(requests.get(url, stream=True).raw).convert('RGB')
+#     return img_pil
+#
+# # Function to get text embedding using CogVLM
+# def _get_text_embedding(model, tokenizer, classes: list, device):
+#     prompts = [f'a photo of a {cls}.' for cls in classes]
+#     tokenized_prompts = tokenizer(prompts).to(device)
+#     text_embedding = model.encode_text(tokenized_prompts)
+#     text_embedding = torch.nn.functional.normalize(text_embedding, dim=-1)
+#     return text_embedding.unsqueeze(0)
+#
+# # Function to convert logits to heatmaps
+# def logits_to_heatmaps(logits, image_cv):
+#     logits = logits[0, 0].detach().cpu().numpy()
+#     logits = (logits * 255).astype('uint8')
+#     heat_map = cv2.applyColorMap(logits, cv2.COLORMAP_JET)
+#     viz = 0.4 * image_cv + 0.6 * heat_map
+#     viz = cv2.cvtColor(viz.astype('uint8'), cv2.COLOR_BGR2RGB)
+#     return viz
+#
+# # Main function to process image and text query
+# def main(image_url, text_query):
+#     image = change_to_url(image_url)
+#     image_tensor = preprocess_pipeline(image).unsqueeze(0).to(DEVICE)
+#     text_emb = _get_text_embedding(model, tokenizer, classes=[text_query], device=DEVICE)
+#     logits_legrad = model.compute_legrad(text_embedding=text_emb, image=image_tensor)
+#     explainability_map = logits_to_heatmaps(logits_legrad, np.array(image))
+#
+#     # Display the image with the heatmap
+#     plt.imshow(explainability_map)
+#     plt.axis('off')
+#     plt.show()
+#
+# if __name__ == "__main__":
+#     image_url = input("Enter the image URL: ")
+#     text_query = input("Enter the text query: ")
+#     main(image_url, text_query)
 
 
-
+#
+import argparse
 import requests
 from PIL import Image
-import open_clip
 import torch
-from transformers import AutoTokenizer
+from transformers import AutoModelForCausalLM, LlamaTokenizer
 from legrad import LeWrapper, LePreprocess, visualize
-from token_alignment import align_tokens  # Import the alignment function
-import torch.nn.functional as F
 
-# Setup
-model_name = 'ViT-B-16'
-pretrained = 'laion2b_s34b_b88k'
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model, _, preprocess = open_clip.create_model_and_transforms(model_name=model_name, pretrained=pretrained, device=device)
-open_tokenizer = open_clip.get_tokenizer(model_name=model_name)
-tokenizer = AutoTokenizer.from_pretrained('lmsys/vicuna-7b-v1.5')
-model_legrad = LeWrapper(model).to(device)
-print(model_legrad)
-preprocess = LePreprocess(preprocess=preprocess, image_size=448)
+# Parse arguments for CogVLM initialization
+parser = argparse.ArgumentParser()
+parser.add_argument("--quant", choices=[4], type=int, default=None, help='quantization bits')
+parser.add_argument("--from_pretrained", type=str, default="THUDM/cogagent-chat-hf", help='pretrained ckpt')
+parser.add_argument("--local_tokenizer", type=str, default="lmsys/vicuna-7b-v1.5", help='tokenizer path')
+parser.add_argument("--fp16", action="store_true")
+parser.add_argument("--bf16", action="store_true")
+parser.add_argument("--image", type=str, default="http://images.cocodataset.org/val2017/000000039769.jpg", help='image url')
+parser.add_argument("--text", type=str, default="a photo of a cat", help='text query')
+args = parser.parse_args()
 
-# Process image
-url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-image = preprocess(Image.open(requests.get(url, stream=True).raw)).unsqueeze(0).to(device)
+# Setup device and data type
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+torch_type = torch.bfloat16 if args.bf16 else torch.float16
 
-# Align and use tokens
-text = ['a photo of a cat', 'a photo of a remote control']
-aligned_tokens = align_tokens(open_tokenizer, tokenizer, text)
-first_tokens = aligned_tokens[0]  # Assuming you want to process the first set of tokens
+# Initialize tokenizer
+tokenizer = LlamaTokenizer.from_pretrained(args.local_tokenizer)
 
-# Ensure the tensor has the correct length (77) expected by the model
-input_ids = torch.tensor(first_tokens, dtype=torch.long).unsqueeze(0).to(device)
-pad_size = 77 - input_ids.shape[1]  # Calculate how much padding is needed
-if pad_size > 0:
-    input_ids = F.pad(input_ids, (0, pad_size), "constant", 0)  # Pad at the end
+# Initialize model
+if args.quant:
+    model = AutoModelForCausalLM.from_pretrained(
+        args.from_pretrained,
+        torch_dtype=torch_type,
+        low_cpu_mem_usage=True,
+        load_in_4bit=True,
+        trust_remote_code=True
+    ).eval()
+else:
+    model = AutoModelForCausalLM.from_pretrained(
+        args.from_pretrained,
+        torch_dtype=torch_type,
+        low_cpu_mem_usage=True,
+        load_in_4bit=args.quant is not None,
+        trust_remote_code=True
+    ).to(DEVICE).eval()
 
-try:
-    text_embedding = model_legrad.encode_text(input_ids, normalize=True)
-    explainability_map = model_legrad.compute_legrad_clip(image=image, text_embedding=text_embedding)
-    visualize(heatmaps=explainability_map, image=image)
-except RuntimeError as e:
-    print("Runtime error:", e)
+# Equip the model with LeGrad
+model = LeWrapper(model)
+
+# Define the preprocessing steps
+def create_cogvlm_preprocess(image_size=448):
+    from torchvision import transforms
+    preprocess_pipeline = transforms.Compose([
+        transforms.Resize((image_size, image_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    return preprocess_pipeline
+
+preprocess_pipeline = create_cogvlm_preprocess()
+
+# Function to load image from URL
+def change_to_url(url):
+    img_pil = Image.open(requests.get(url, stream=True).raw).convert('RGB')
+    return img_pil
+
+# Function to get text embedding using CogVLM
+def _get_text_embedding(model, tokenizer, classes: list, device):
+    prompts = [f'a photo of a {cls}.' for cls in classes]
+    tokenized_prompts = tokenizer(prompts).to(device)
+    text_embedding = model.encode_text(tokenized_prompts)
+    text_embedding = torch.nn.functional.normalize(text_embedding, dim=-1)
+    return text_embedding.unsqueeze(0)
+
+# Function to convert logits to heatmaps
+def logits_to_heatmaps(logits, image_cv):
+    logits = logits[0, 0].detach().cpu().numpy()
+    logits = (logits * 255).astype('uint8')
+    heat_map = cv2.applyColorMap(logits, cv2.COLORMAP_JET)
+    viz = 0.4 * image_cv + 0.6 * heat_map
+    viz = cv2.cvtColor(viz.astype('uint8'), cv2.COLOR_BGR2RGB)
+    return viz
+
+# Main function to process image and text query
+def main(image_url, text_query):
+    image = change_to_url(image_url)
+    image_tensor = preprocess_pipeline(image).unsqueeze(0).to(DEVICE)
+    text_emb = _get_text_embedding(model, tokenizer, classes=[text_query], device=DEVICE)
+    logits_legrad = model.compute_legrad(text_embedding=text_emb, image=image_tensor)
+    explainability_map = logits_to_heatmaps(logits_legrad, np.array(image))
+
+    # Display the image with the heatmap
+    plt.imshow(explainability_map)
+    plt.axis('off')
+    plt.show()
+
+if __name__ == "__main__":
+    image_url = input("Enter the image URL: ")
+    text_query = input("Enter the text query: ")
+    main(image_url, text_query)
 

@@ -24,6 +24,7 @@ def align_tokens(openclip_tokenizer, vicuna_tokenizer, texts):
             for j, vicuna_token in enumerate(vicuna_tokens):
                 openclip_token_tensor = torch.tensor([openclip_token], dtype=torch.float32)
                 vicuna_token_tensor = torch.tensor([vicuna_token.item()], dtype=torch.float32)
+                print(openclip_token_tensor, vicuna_token_tensor)
                 similarity = cosine_similarity(openclip_token_tensor, vicuna_token_tensor)
                 A[i, j] = similarity.item()
 
