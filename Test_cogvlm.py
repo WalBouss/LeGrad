@@ -68,7 +68,8 @@ def change_to_url(url):
 def _get_text_embedding(model, tokenizer, prompts, device):
     tokenized_prompts = tokenizer(prompts, return_tensors='pt', padding=True, truncation=True).to(device)
     with torch.no_grad():
-        outputs = model(**tokenized_prompts)
+        # Forward pass to obtain encoder outputs (text embeddings)
+        outputs = model.model.encoder(input_ids=tokenized_prompts.input_ids, attention_mask=tokenized_prompts.attention_mask)
         text_embeddings = outputs.last_hidden_state.mean(dim=1)  # Mean pooling
     text_embeddings = torch.nn.functional.normalize(text_embeddings, dim=-1)
     return text_embeddings
