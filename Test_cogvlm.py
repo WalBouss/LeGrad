@@ -23,26 +23,15 @@ args = parser.parse_args()
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 torch_type = torch.bfloat16 if args.bf16 else torch.float16
 
-# Initialize tokenizer
 tokenizer = LlamaTokenizer.from_pretrained(args.local_tokenizer)
 
 # Initialize model
-if args.quant:
-    model = AutoModelForCausalLM.from_pretrained(
-        args.from_pretrained,
-        torch_dtype=torch_type,
-        low_cpu_mem_usage=True,
-        load_in_4bit=True,
-        trust_remote_code=True
-    ).eval()
-else:
-    model = AutoModelForCausalLM.from_pretrained(
-        args.from_pretrained,
-        torch_dtype=torch_type,
-        low_cpu_mem_usage=True,
-        load_in_4bit=args.quant is not None,
-        trust_remote_code=True
-    ).to(DEVICE).eval()
+model = AutoModelForCausalLM.from_pretrained(
+    args.from_pretrained,
+    torch_dtype=torch.bfloat16 if args.bf16 else torch.float16,
+    low_cpu_mem_usage=False,
+    trust_remote_code=True
+).to(DEVICE).eval()
 
 # Equip the model with LeGrad
 model = LeWrapper(model)
@@ -64,15 +53,24 @@ def change_to_url(url):
     img_pil = Image.open(requests.get(url, stream=True).raw).convert('RGB')
     return img_pil
 
-# Corrected function to get text embedding using CogVLM
-def _get_text_embedding(model, tokenizer, prompts, device):
-    tokenized_prompts = tokenizer(prompts, return_tensors='pt', padding=True, truncation=True).to(device)
+
+def _get_text_embedding(model, tokenizer, query, device, image):
+    # Prepare inputs using the custom build_conversation_input_ids method
+    inputs = model.build_conversation_input_ids(tokenizer, query=query, history=[], images=[image])  # chat mode
+    inputs = {
+        'input_ids': inputs['input_ids'].unsqueeze(0).to(device),
+        'token_type_ids': inputs['token_type_ids'].unsqueeze(0).to(device),
+        'attention_mask': inputs['attention_mask'].unsqueeze(0).to(device),
+        'images': [[inputs['images'][0].to(device).to(torch.bfloat16 if args.bf16 else torch.float16)]],
+    }
+
+    gen_kwargs = {"max_length": 2048, "do_sample": False}
+
     with torch.no_grad():
-        # Forward pass to obtain encoder outputs (text embeddings)
-        outputs = model.model.encoder(input_ids=tokenized_prompts.input_ids, attention_mask=tokenized_prompts.attention_mask)
-        #Model.encoder doens't
-        text_embeddings = outputs.last_hidden_state.mean(dim=1)  # Mean pooling
-    text_embeddings = torch.nn.functional.normalize(text_embeddings, dim=-1)
+        outputs = model.generate(**inputs, **gen_kwargs)
+        outputs = outputs[:, inputs['input_ids'].shape[1]:]
+        text_embeddings = tokenizer.decode(outputs[0])
+
     return text_embeddings
 
 # Function to convert logits to heatmaps
@@ -84,18 +82,37 @@ def logits_to_heatmaps(logits, image_cv):
     viz = cv2.cvtColor(viz.astype('uint8'), cv2.COLOR_BGR2RGB)
     return viz
 
-# Main function to process image and text query
 def main(image_url, text_query):
     image = change_to_url(image_url)
     image_tensor = preprocess_pipeline(image).unsqueeze(0).to(DEVICE)
-    text_emb = _get_text_embedding(model, tokenizer, [text_query], DEVICE)
-    logits_legrad = model.compute_legrad(text_embedding=text_emb, image=image_tensor)
+
+    # Get text embeddings
+    text_emb = _get_text_embedding(model, tokenizer, text_query, DEVICE, image)
+
+    # Debugging statement for text embeddings
+    print(f"Text Embeddings: {text_emb}")
+
+    # Get visual features using the visual encoder (Eva2LargeEncoder)
+    visual_encoder = model.model.vision.model
+    with torch.no_grad():
+        visual_features = visual_encoder(image_tensor)
+
+    # Debugging statement for visual features
+    print(f"Visual Features: {visual_features}")
+
+    # Compute LeGrad logits
+    logits_legrad = model.compute_legrad(text_embedding=text_emb, image=visual_features)
+
+    # Debugging statement for logits
+    print(f"Logits: {logits_legrad}")
+
     explainability_map = logits_to_heatmaps(logits_legrad, np.array(image))
 
     # Display the image with the heatmap
     plt.imshow(explainability_map)
     plt.axis('off')
     plt.show()
+
 
 if __name__ == "__main__":
     main(args.image, args.text)
