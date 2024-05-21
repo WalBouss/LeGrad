@@ -93,7 +93,9 @@ def main(image_url, text_query):
     print(f"Text Embeddings: {text_emb}")
 
     # Get visual features using the visual encoder (Eva2LargeEncoder)
-    visual_encoder = model.model.vision.model
+
+    # Debugging statement to
+    visual_encoder = model.model.vision
     with torch.no_grad():
         visual_features = visual_encoder(image_tensor)
 
