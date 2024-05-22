@@ -4,7 +4,6 @@ import numpy as np
 from PIL import Image
 import cv2 as cv2
 import warnings
-
 import torch
 from torch import Tensor
 from torch.nn import functional as F
@@ -50,19 +49,22 @@ def hooked_attention_forward(self, x, x_k, x_v, attn_mask: Optional[torch.Tensor
     return x
 
 def hooked_attention_forward(self, x: "tensor(B, L, D)") -> "tensor(B, L, D)":
-        B, L, _ = x.shape
-        qkv = self.query_key_value(x)
-        qkv = qkv.reshape(B, L, 3, self.num_heads, -1).permute(2, 0, 1, 3, 4)  # 3, B, L, H, D
-        q, k, v = qkv[0], qkv[1], qkv[2]
+    B, L, _ = x.shape
+    qkv = self.query_key_value(x)
+    qkv = qkv.reshape(B, L, 3, self.num_heads, -1).permute(2, 0, 1, 3, 4)  # 3, B, L, H, D
+    q, k, v = qkv[0], qkv[1], qkv[2]
+    # Call the local memory_efficient_attention function
+    out, attn_weights = memory_efficient_attention(
+        q, k, v, scale=self.scale,
+    )
+    print(f"testing if local version works", attn_weights.shape)
+    output = self.dense(out.view(B, L, -1))
+    output = self.output_dropout(output)
 
-        print("testing if xops work")
-        out = xops.memory_efficient_attention(
-            q, k, v, scale=self.scale,
-        )
-        print("testing if xops work")
-        output = self.dense(out.view(B, L, -1))
-        output = self.output_dropout(output)
-        return output
+    # Save the attention weights
+    self.attention_map = attn_weights
+
+    return output
     
 
 
@@ -597,6 +599,86 @@ def list_pretrained():
 
     print(_str)
     return filtered_list
+
+
+def memory_efficient_attention(
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        attn_bias: Optional[torch.Tensor] = None,
+        p: float = 0.0,
+        scale: Optional[float] = None,
+        output_dtype: Optional[torch.dtype] = None,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Implements the memory-efficient attention mechanism following
+    `"Self-Attention Does Not Need O(n^2) Memory" <http://arxiv.org/abs/2112.05682>`_.
+
+    :Inputs shape:
+
+    - Input tensors must be in format ``[B, M, H, K]``, where B is the batch size, M \
+        the sequence length, H the number of heads, and K the embedding size per head
+
+    - If inputs have dimension 3, it is assumed that the dimensions are ``[B, M, K]`` and ``H=1``
+
+    - Inputs can be non-contiguous - we only require the last dimension's stride to be 1
+
+
+    :Equivalent pytorch code:
+
+    .. code-block:: python
+
+        scale = 1.0 / query.shape[-1] ** 0.5
+        query = query * scale
+        query = query.transpose(1, 2)
+        key = key.transpose(1, 2)
+        value = value.transpose(1, 2)
+        attn = query @ key.transpose(-2, -1)
+        if attn_bias is not None:
+            attn = attn + attn_bias
+        attn = attn.softmax(-1)
+        attn = F.dropout(attn, p)
+        attn = attn @ value
+        return attn.transpose(1, 2)
+    """
+
+    # Ensure that inputs are contiguous
+    query = query.contiguous()
+    key = key.contiguous()
+    value = value.contiguous()
+
+    B, M, H, K = query.shape
+
+    if scale is None:
+        scale = 1.0 / (K ** 0.5)
+
+    query = query * scale
+
+    # Transpose for the attention mechanism
+    query = query.transpose(1, 2)  # (B, H, M, K)
+    key = key.transpose(1, 2)  # (B, H, M, K)
+    value = value.transpose(1, 2)  # (B, H, M, K)
+
+    # Compute the attention scores
+    attn = torch.matmul(query, key.transpose(-2, -1))  # (B, H, M, M)
+
+    if attn_bias is not None:
+        attn = attn + attn_bias
+
+    # Apply softmax to get the attention probabilities
+    attn = torch.softmax(attn, dim=-1)  # (B, H, M, M)
+    attn = F.dropout(attn, p=p)  # (B, H, M, M)
+
+    # Compute the output
+    output = torch.matmul(attn, value)  # (B, H, M, K)
+
+    # Transpose back to the original format
+    output = output.transpose(1, 2)  # (B, M, H, K)
+
+    if output_dtype is not None:
+        output = output.to(output_dtype)
+
+    return output, attn
 
 
 if __name__ == '__main__':
