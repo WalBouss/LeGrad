@@ -49,26 +49,56 @@ def hooked_attention_forward(self, x, x_k, x_v, attn_mask: Optional[torch.Tensor
     x = self.out_proj(x)
     return x
 
+def hooked_attention_forward(self, x: "tensor(B, L, D)") -> "tensor(B, L, D)":
+        B, L, _ = x.shape
+        qkv = self.query_key_value(x)
+        qkv = qkv.reshape(B, L, 3, self.num_heads, -1).permute(2, 0, 1, 3, 4)  # 3, B, L, H, D
+        q, k, v = qkv[0], qkv[1], qkv[2]
+
+        print("testing if xops work")
+        out = xops.memory_efficient_attention(
+            q, k, v, scale=self.scale,
+        )
+        print("testing if xops work")
+        output = self.dense(out.view(B, L, -1))
+        output = self.output_dropout(output)
+        return output
+    
+
 
 # ------------ Hooked Residual Transformer Block ------------
 # from https://github.com/mlfoundations/open_clip/blob/73fa7f03a33da53653f61841eb6d69aef161e521/src/open_clip/transformer.py#L231
-def hooked_resblock_forward(
-        self,
-        q_x: torch.Tensor,
-        k_x: Optional[torch.Tensor] = None,
-        v_x: Optional[torch.Tensor] = None,
-        attn_mask: Optional[torch.Tensor] = None,
-):
-    k_x = self.ln_1_kv(k_x) if hasattr(self, "ln_1_kv") and k_x is not None else None
-    v_x = self.ln_1_kv(v_x) if hasattr(self, "ln_1_kv") and v_x is not None else None
+# def hooked_resblock_forward(
+#         self,
+#         q_x: torch.Tensor,
+#         k_x: Optional[torch.Tensor] = None,
+#         v_x: Optional[torch.Tensor] = None,
+#         attn_mask: Optional[torch.Tensor] = None,
+# ):
+#     k_x = self.ln_1_kv(k_x) if hasattr(self, "ln_1_kv") and k_x is not None else None
+#     v_x = self.ln_1_kv(v_x) if hasattr(self, "ln_1_kv") and v_x is not None else None
 
-    x = q_x + self.ls_1(self.attention(q_x=self.ln_1(q_x), k_x=k_x, v_x=v_x, attn_mask=attn_mask))
-    # Hook for intermediate features post Attn
-    self.feat_post_attn = x
-    x = x + self.ls_2(self.mlp(self.ln_2(x)))
-    # Hook for intermediate features post MLP
-    self.feat_post_mlp = x
-    return x
+#     x = q_x + self.ls_1(self.attention(q_x=self.ln_1(q_x), k_x=k_x, v_x=v_x, attn_mask=attn_mask))
+#     # Hook for intermediate features post Attn
+#     self.feat_post_attn = x
+#     x = x + self.ls_2(self.mlp(self.ln_2(x)))
+#     # Hook for intermediate features post MLP
+#     self.feat_post_mlp = x
+#     return x
+
+def hooked_resblock_forward(self, hidden_states):
+        attention_input = hidden_states
+        attention_output = self.input_layernorm(self.attention(attention_input))
+        
+        hidden_states = attention_input + attention_output
+        self.feat_post_attn = hidden.states # ADDED, IMPORTANT
+        
+        mlp_input = hidden_states
+        mlp_output = self.post_attention_layernorm(self.mlp(mlp_input))
+        output = mlp_input + mlp_output
+        
+        self.feat_post_mlp = output # ADDED, IMPORTANT
+        return output
 
 
 # ------------ Hooked PyTorch's Multi-Head AttentionResidual ------------
@@ -434,10 +464,16 @@ def hooked_attentional_pooler_timm_forward(self, x):
 
 # ------------ OpenCLIP ViT forward with dynamic size ------------
 def vit_dynamic_size_forward(self, x: torch.Tensor):
-    x = self.conv1(x)  # shape = [*, width, grid, grid]
+    # self -> self.model.vision
+    
+    print("self: ",self)
+    x = self.patch_embedding.proj(x)  # shape = [*, width, grid, grid]
+    print("Conv2d working")
+    
     grid_h, grid_w = x.shape[2:]
     x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
     x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
+
 
     # class embeddings and positional embeddings
     x = torch.cat([_expand_token(self.class_embedding, x.shape[0]).to(x.dtype), x], dim=1)
