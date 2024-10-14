@@ -84,7 +84,7 @@ class LeWrapper(nn.Module):
 
         # --- Activate the hooks for the specific layers ---
         for layer in range(self.starting_depth, len(self.visual.transformer.resblocks)):
-            self.visual.transformer.resblocks[layer].attn.forward = types.MethodType(hooked_attention_forward,
+            self.visual.transformer.resblocks[layer].attn.forward = types.MethodType(hooked_torch_multi_head_attention_forward,
                                                                                      self.visual.transformer.resblocks[
                                                                                          layer].attn)
             self.visual.transformer.resblocks[layer].forward = types.MethodType(hooked_resblock_forward,
@@ -144,7 +144,7 @@ class LeWrapper(nn.Module):
     def compute_legrad_clip(self, text_embedding, image=None):
         num_prompts = text_embedding.shape[0]
         if image is not None:
-            # image = image.repeat(num_prompts, 1, 1, 1)
+            image = image.repeat(num_prompts, 1, 1, 1)
             _ = self.encode_image(image)
 
         blocks_list = list(dict(self.visual.transformer.resblocks.named_children()).values())
@@ -168,7 +168,7 @@ class LeWrapper(nn.Module):
             one_hot = F.one_hot(torch.arange(0, num_prompts)).float().requires_grad_(True).to(text_embedding.device)
             one_hot = torch.sum(one_hot * sim)
 
-            attn_map = blocks_list[self.starting_depth + layer].attn.attention_map  # [b, num_heads, N, N]
+            attn_map = blocks_list[self.starting_depth + layer].attn.attention_maps  # [b, num_heads, N, N]
 
             # -------- Get explainability map --------
             grad = torch.autograd.grad(one_hot, [attn_map], retain_graph=True, create_graph=True)[
